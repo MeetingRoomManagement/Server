@@ -16,6 +16,11 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.json.JSONObject;
 
+import com.mysql.jdbc.EscapeTokenizer;
+import com.sun.org.apache.xml.internal.dtm.ref.DTMDefaultBaseIterators.PrecedingIterator;
+
+import sun.security.util.Password;
+
 /**
  * Servlet implementation class ClientServlet
  */
@@ -37,7 +42,7 @@ public class ClientServlet extends HttpServlet {
     	String createS = "CREATE TABLE IF NOT EXISTS client_manager(" + //验证正确性！！！！
 				"   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY," + 
 				"   name VARCHAR(20)," + 
-				"   password VARCHAR(21)," + ///8888 
+				"   password VARCHAR(21)" + ///8888 
 				");";
     	stmt.execute(createS);
     }
@@ -51,9 +56,18 @@ public class ClientServlet extends HttpServlet {
     	out.write(jsonObject.toString());
     }
     
+    public void sendNoError() throws Exception{
+    	Map<String, String> map = new HashMap<String,String>();
+    	JSONObject jsonObject = new JSONObject();
+    	map.put("error", "0");
+    	jsonObject.put("map", map);
+    	PrintWriter out = response.getWriter();
+    	out.write(jsonObject.toString());
+    }
+    
     public boolean query(java.sql.Statement stmt) {
     	String name = request.getParameter("name");
-    	String QueryS = "SELECT * from meetingroom_manager where name=" + name;//补充数据库语句
+    	String QueryS = "SELECT * from client_manager where name=" + name;//补充数据库语句
     	try {
     		ResultSet rs = stmt.executeQuery(QueryS);
     		if(rs.next()) {
@@ -66,22 +80,23 @@ public class ClientServlet extends HttpServlet {
 		return false;
     }
     
-    public void register(java.sql.Statement stmt) throws SQLException, IOException {
+    public void register(java.sql.Statement stmt) throws Exception {
     	if(query(stmt)) {
     		sendError("existed");
     		return;
     	}
     	String name = request.getParameter("name");
-    	String password = request.getParameter("request");
-    	String registerS = "INSERT INTO meetingroom_manager (name,password)" +
+    	String password = request.getParameter("password");
+    	String registerS = "INSERT INTO client_manager (name,password)" +
 				"VALUES (" + name + "," + password + ")";
     	stmt.execute(registerS);
+    	sendNoError();
     }
     
     public void signIn(java.sql.Statement stmt) throws Exception {
     	if(query(stmt)) {
     		String name = request.getParameter("name");
-        	String QueryS = "SELECT * from meetingroom_manager where name=" + name;
+        	String QueryS = "SELECT * from client_manager where name=" + name;
         	try {
         		ResultSet rs = stmt.executeQuery(QueryS);
         		if(rs.next()) {
@@ -98,6 +113,7 @@ public class ClientServlet extends HttpServlet {
         			jsonObject.put("map", map);
         			PrintWriter out = response.getWriter();
         			out.write(jsonObject.toString());
+        			sendNoError();
         		}
         	}
         	catch(Exception e) {
@@ -110,17 +126,25 @@ public class ClientServlet extends HttpServlet {
     }
     
     public void update(java.sql.Statement stmt) throws Exception{
-    	if(query(stmt)) {
-    		String name = request.getParameter("name");
+    	String name = request.getParameter("name");
+    	String QueryS = "SELECT password FROM client_manager WHERE name=" + name;
+    	ResultSet rs = stmt.executeQuery(QueryS);
+    	if(rs.next()) {
     		String password = request.getParameter("password");
-    		String QueryS = "UPDATE client_manager SET password=" + password + " WHERE name=" + name;
-    		stmt.execute(QueryS);
+    		if(password.equals(rs.getString("password"))) {
+    			String newPassword = request.getParameter("newPassword");
+    			String UpdateS = "UPDATE client_manager SET password=" + newPassword + " WHERE name=" + name;
+    			stmt.execute(UpdateS);
+    			sendNoError();
+    		}
+    		else {
+    			sendError("incorrectPassowrd");
+    		}	
     	}
     	else {
     		sendError("notExisted");
     	}
     }
-
 	/**
 	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
 	 */
@@ -137,7 +161,7 @@ public class ClientServlet extends HttpServlet {
     		String action = request.getParameter("action");
     		create(stmt);
     		switch(action){
-    		case "register": register(stmt);break;
+    		case "regist": register(stmt);break;
     		case "signIn": signIn(stmt);break;
     		case "alter": update(stmt);break;
     		}
